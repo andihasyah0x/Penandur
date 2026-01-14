@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PENANDUR - 3D Experience</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'farm-bg': '#f8fafc',
+                        'farm-dark': '#0f172a',
+                        'farm-primary': '#059669', // Emerald
+                        'farm-accent': '#84cc16',  // Lime
+                        'farm-soft': '#dcfce7',    // Light Green
+                    },
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        heading: ['"Outfit"', 'sans-serif'],
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite', // Efek Ngambang Lambat
+                        'float-fast': 'float 4s ease-in-out infinite', // Efek Ngambang Cepat
+                        'ticker': 'ticker 60s linear infinite',
+                        'pop': 'pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+                    },
+                    keyframes: {
+                        float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-20px)' } },
+                        ticker: { '0%': { transform: 'translateX(0)' }, '100%': { transform: 'translateX(-100%)' } },
+                        pop: { '0%': { transform: 'scale(0.8)', opacity: 0 }, '100%': { transform: 'scale(1)', opacity: 1 } }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f8fafc; color: #0f172a; font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; }
+        
+        /* 3D Card Style */
+        .fresh-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05); /* Bayangan Halus Awal */
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Efek Membal */
+        }
+        
+        .fresh-card:hover {
+            transform: translateY(-10px) scale(1.02); /* Naik ke atas saat hover (3D Lift) */
+            box-shadow: 0 20px 40px -10px rgba(5, 150, 105, 0.2); /* Bayangan Menebal & Berwarna */
+            border-color: #bef264;
+        }
+        
+        /* Floating Background Elements */
+        .mesh-bg {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1;
+            background: radial-gradient(circle at 0% 0%, rgba(220, 252, 231, 0.8), transparent 40%),
+                        radial-gradient(circle at 100% 100%, rgba(254, 249, 195, 0.6), transparent 40%);
+        }
+        
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .ticker-wrap:hover .animate-\[ticker_60s_linear_infinite\] { animation-play-state: paused; }
+    </style>
+</head>
+<body class="antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const WA_NUMBER = "6282332681226"; 
+        const openWA = (msg) => window.open(`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank');
+
+        // --- DATA PRODUK ---
+        const PRODUCTS = [
+            { id: 1, name: "Sawi Hijau", type: 'Sayur', price: 5000, img: "https://images.unsplash.com/photo-1576045057995-568f588f82fb?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", tag: "Fast Grow" },
+            { id: 2, name: "Kangkung", type: 'Sayur', price: 5000, img: "https://images.unsplash.com/photo-1629156365574-d02f37c223c9?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", tag: "Easy" },
+            { id: 3, name: "Bayam", type: 'Sayur', price: 6000, img: "https://images.unsplash.com/photo-1550953922-839556db123b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", tag: "Iron Boost" },
+            { id: 4, name: "Selada", type: 'Sayur', price: 8000, img: "https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", tag: "Hydro" },
+            { id: 5, name: "Anggur", type: 'Rambat', price: 85000, img: "https://images.unsplash.com/photo-1537640538965-1756cd582ea1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", tag: "Sweet" },
+            { id: 6, name: "Cabai Rawit", type: 'Buah', price: 15000, img: "https://images.unsplash.com/photo-1563714271297-b2e5576a8047?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", tag: "Hot" },
+            { id: 7, name: "Terong Ungu", type: 'Buah', price: 12000, img: "https://images.unsplash.com/photo-1601648764658-cf37e8c07b70?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", tag: "Big" },
+            { id: 8, name: "Mangga", type: 'Pohon', price: 65000, img: "https://images.unsplash.com/photo-1553279768-865429fa0078?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", tag: "Premium" },
+            { id: 9, name: "Jambu Air", type: 'Pohon', price: 45000, img: "https://images.unsplash.com/photo-1596507639908-e4b70a75f5c1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", tag: "Fresh" },
+        ];
+
+        const STATS = [
+            { label: "Pelanggan Puas", value: "12.5K+", icon: "fa-users" },
+            { label: "Bibit Terjual", value: "50K+", icon: "fa-seedling" },
+            { label: "Tingkat Tumbuh", value: "98%", icon: "fa-chart-line" },
+            { label: "Urban Farming", value: "+67%", icon: "fa-building-wheat" }
+        ];
+
+        const FUN_FACTS = [
+            "🌳 1 Pohon = Oksigen 2 Orang/Thn",
+            "🍎 Apel Mengapung (25% Udara)",
+            "🥕 Wortel Asli Warnanya Ungu!",
+            "🍅 Tomat itu Buah, Bukan Sayur",
+            "🥒 Mentimun = 96% Air",
+            "🌶️ Cabai Terpedas = 2.2 Juta SHU",
+            "🥑 Alpukat Dulu Makanan Hewan Purba"
+        ];
+
+        const ARTICLES = [
+            { id: 1, title: "5 Cara Merawat Bibit Mangga", cat: "Tips", date: "12 Jan", views: "2.4K", img: "https://images.unsplash.com/photo-1553279768-865429fa0078?w=200" },
+            { id: 2, title: "Rahasia Penyiraman yang Benar", cat: "Tips", date: "11 Jan", views: "3.8K", img: "https://images.unsplash.com/photo-1599577749171-d610367eb762?w=200" },
+            { id: 3, title: "Buat Pupuk Kompos di Rumah", cat: "Panduan", date: "09 Jan", views: "5.2K", img: "https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=200" },
+            { id: 4, title: "Hidroponik Hemat Lahan 90%", cat: "Inovasi", date: "10 Jan", views: "3.1K", img: "https://images.unsplash.com/photo-1556910103-1c02745a30bf?w=200" }
+        ];
+
+        const TESTIMONIALS = [
+            { name: "Bu Siti", role: "Ibu Rumah Tangga", text: "Saya pemula, coba tanam Kangkung dari PENANDUR, 21 hari panen!", star: 5 },
+            { name: "Pak Budi", role: "Pensiunan", text: "Bibit Mangga-nya kualitas super. Konsultasi WA sangat membantu.", star: 5 },
+            { name: "Kak Rara", role: "Mahasiswi", text: "Suka banget sama kuis rekomendasinya. Jadi tau kalau kost-an cocoknya tanam Selada.", star: 4 }
+        ];
+
+        // --- COMPONENTS ---
+
+        const DockNav = ({ activeTab, setTab, cartCount, onCart }) => (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+                <div className="bg-white/90 rounded-full px-8 py-4 flex items-center gap-12 shadow-2xl border border-white/50 backdrop-blur-xl animate-pop">
+                    <button onClick={() => setTab('home')} className={`flex flex-col items-center gap-1 transition duration-300 ${activeTab === 'home' ? 'text-farm-primary scale-125' : 'text-slate-400 hover:text-slate-600'}`}>
+                        <i className="fa-solid fa-layer-group text-xl"></i>
+                    </button>
+                    
+                    <button onClick={onCart} className="bg-farm-primary text-white w-16 h-16 rounded-full flex items-center justify-center -mt-12 shadow-lg hover:scale-110 transition border-4 border-white relative group animate-float-fast">
+                        <i className="fa-solid fa-basket-shopping text-xl group-hover:animate-bounce"></i>
+                        {cartCount > 0 && <span className="absolute top-0 right-0 bg-red-500 w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold border-2 border-white">{cartCount}</span>}
+                    </button>
+
+                    <button onClick={() => setTab('shop')} className={`flex flex-col items-center gap-1 transition duration-300 ${activeTab === 'shop' ? 'text-farm-primary scale-125' : 'text-slate-400 hover:text-slate-600'}`}>
+                        <i className="fa-solid fa-store text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        );
+
+        const HeroStats = () => (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-4 mb-8">
+                {STATS.map((s, i) => (
+                    <div key={i} className="fresh-card p-4 rounded-2xl flex flex-col items-center text-center hover:bg-farm-soft/50 transition">
+                        <i className={`fa-solid ${s.icon} text-farm-primary text-xl mb-2`}></i>
+                        <h4 className="text-2xl font-bold text-farm-dark">{s.value}</h4>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wide">{s.label}</p>
+                    </div>
+                ))}
+            </div>
+        );
+
+        const FunFactsTicker = () => (
+            <div className="mb-10 w-full overflow-hidden bg-white border-y border-slate-100 py-4 ticker-wrap shadow-sm">
+                <div className="whitespace-nowrap w-full overflow-hidden">
+                    <div className="animate-[ticker_60s_linear_infinite] inline-block text-sm text-slate-600 px-4 font-medium">
+                        {FUN_FACTS.map((f, i) => (
+                            <span key={i} className="mr-10"><i className="fa-solid fa-lightbulb text-farm-accent mr-2"></i> {f}</span>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+
+        const ArticleList = () => (
+            <div className="px-4 mb-12">
+                <div className="flex justify-between items-end mb-6">
+                    <h3 className="font-heading text-xl font-bold text-farm-dark">Wawasan <span className="text-farm-primary">Tani</span></h3>
+                    <span className="text-xs text-slate-400">Update Harian</span>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                    {ARTICLES.map(a => (
+                        <div key={a.id} className="fresh-card p-3 rounded-3xl flex gap-4 items-center hover:shadow-md transition cursor-pointer group bg-white">
+                            <div className="relative w-20 h-20 shrink-0">
+                                <img src={a.img} className="w-full h-full rounded-2xl object-cover" />
+                                <div className="absolute top-1 left-1 bg-farm-primary/90 px-1.5 rounded text-[8px] font-bold text-white">{a.cat}</div>
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="font-bold text-sm text-farm-dark mb-1 group-hover:text-farm-primary transition">{a.title}</h4>
+                                <div className="flex gap-3 text-[10px] text-slate-400">
+                                    <span><i className="fa-regular fa-calendar mr-1"></i>{a.date}</span>
+                                    <span><i className="fa-regular fa-eye mr-1"></i>{a.views}</span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        const TestimonialSlider = () => (
+            <div className="px-4 mb-16">
+                <h3 className="font-heading text-xl font-bold mb-6 text-center text-farm-dark">Kata <span className="text-farm-primary">Mereka</span></h3>
+                <div className="flex overflow-x-auto gap-4 hide-scroll pb-4 snap-x">
+                    {TESTIMONIALS.map((t, i) => (
+                        <div key={i} className="min-w-[280px] fresh-card p-6 rounded-3xl snap-center bg-white relative">
+                            <i className="fa-solid fa-quote-right absolute top-4 right-4 text-slate-100 text-4xl"></i>
+                            <div className="flex gap-1 text-yellow-400 text-xs mb-3">
+                                {[...Array(t.star)].map((_, i) => <i key={i} className="fa-solid fa-star"></i>)}
+                            </div>
+                            <p className="text-sm text-slate-600 italic mb-4 leading-relaxed">"{t.text}"</p>
+                            <div className="flex items-center gap-3 border-t border-slate-100 pt-3">
+                                <div className="w-8 h-8 rounded-full bg-farm-soft flex items-center justify-center text-xs font-bold text-farm-primary">{t.name[0]}</div>
+                                <div>
+                                    <p className="text-xs font-bold text-farm-dark">{t.name}</p>
+                                    <p className="text-[10px] text-slate-400">{t.role}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        // --- HOME PAGE ---
+        const HomePage = ({ onQuiz, onPreOrder }) => (
+            <div className="pb-32 animate-pop">
+                {/* Header Clean */}
+                <div className="px-6 pt-8 pb-6 flex justify-between items-center bg-white/50 backdrop-blur-sm sticky top-0 z-40">
+                    <div>
+                        <h1 className="font-heading font-extrabold text-2xl tracking-tight text-farm-dark">PENANDUR<span className="text-farm-primary">.</span></h1>
+                        <p className="text-xs text-slate-500 font-medium tracking-wide">DIGITALISASI TANI KEBRAON</p>
+                    </div>
+                    <button onClick={() => openWA('Halo Admin')} className="w-10 h-10 rounded-full glass-card flex items-center justify-center text-slate-600 hover:text-farm-primary transition">
+                        <i className="fa-regular fa-paper-plane"></i>
+                    </button>
+                </div>
+
+                {/* Hero Card (Floating Effect) */}
+                <div className="px-4 mb-8">
+                    <div className="rounded-[2.5rem] p-8 relative overflow-hidden shadow-xl bg-gradient-to-r from-farm-primary to-emerald-500 text-white group animate-float">
+                        <div className="relative z-10">
+                            <span className="inline-block px-3 py-1 rounded-full bg-white/20 text-white text-[10px] font-bold tracking-widest mb-4 backdrop-blur-sm">URBAN FARMING</span>
+                            <h2 className="font-heading text-4xl font-medium leading-tight mb-4">
+                                Mulai Tanam<br/><span className="font-extrabold text-farm-accent">Sekarang.</span>
+                            </h2>
+                            <p className="text-white/80 text-sm mb-8 font-light max-w-xs leading-relaxed">
+                                Hemat lahan 90%, produktivitas naik 300%. Bergabunglah dengan revolusi hijau.
+                            </p>
+                            <div className="flex gap-3">
+                                <button onClick={onQuiz} className="bg-white text-farm-primary px-5 py-3 rounded-full font-bold text-sm hover:scale-105 transition shadow-lg flex items-center gap-2">
+                                    <i className="fa-solid fa-wand-magic-sparkles"></i> Rekomendasi
+                                </button>
+                                <button onClick={onPreOrder} className="bg-farm-accent text-farm-dark px-5 py-3 rounded-full font-bold text-sm hover:scale-105 transition shadow-lg flex items-center gap-2">
+                                    <i className="fa-solid fa-box-open"></i> Pre-Order
+                                </button>
+                            </div>
+                        </div>
+                        <div className="absolute -right-10 -bottom-10 opacity-20"><i className="fa-solid fa-leaf text-[12rem]"></i></div>
+                    </div>
+                </div>
+
+                <HeroStats />
+                <FunFactsTicker />
+                <ArticleList />
+                <TestimonialSlider />
+
+                {/* Footer Clean & Simple */}
+                <div className="mt-8 border-t border-slate-200 pt-8 pb-24 text-center px-6">
+                    <h2 className="font-heading font-bold text-xl text-farm-primary mb-2">PENANDUR</h2>
+                    <p className="text-sm text-slate-500 italic font-medium mb-6">"Menanam Harapan, Menuai Masa Depan"</p>
+                    <div className="flex justify-center gap-4 mb-6">
+                        <div onClick={()=>openWA('Halo')} className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-green-500 hover:scale-110 transition cursor-pointer"><i className="fa-brands fa-whatsapp"></i></div>
+                        <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-pink-500 hover:scale-110 transition cursor-pointer"><i className="fa-brands fa-instagram"></i></div>
+                        <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400 hover:text-blue-500 hover:scale-110 transition cursor-pointer"><i className="fa-brands fa-facebook-f"></i></div>
+                    </div>
+                    <div className="w-12 h-1 bg-slate-200 mx-auto mb-4 rounded-full"></div>
+                    <p className="text-xs text-slate-400 flex items-center justify-center gap-2">
+                        <i className="fa-solid fa-location-dot"></i> Jl. Kebraon V, Surabaya, Jawa Timur
+                    </p>
+                </div>
+            </div>
+        );
+
+        // --- SHOP PAGE ---
+        const ShopPage = ({ onAdd }) => (
+            <div className="pt-8 pb-32 px-4 animate-pop">
+                <div className="text-center mb-8 pt-6">
+                    <h2 className="font-heading text-2xl font-bold text-farm-dark">Katalog <span className="text-farm-primary">Bibit</span></h2>
+                    <p className="text-xs text-slate-500 mt-1">Stok Terbatas dari Kebun Kebraon</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    {PRODUCTS.map(p => (
+                        <div key={p.id} className="fresh-card rounded-3xl p-3 group bg-white">
+                            <div className="relative h-40 rounded-2xl overflow-hidden mb-3">
+                                <img src={p.img} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" loading="lazy" />
+                                <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold text-farm-primary shadow-sm">
+                                    {p.tag}
+                                </div>
+                            </div>
+                            <div className="px-1">
+                                <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">{p.type}</p>
+                                <h3 className="font-bold text-base leading-tight mb-3 text-farm-dark">{p.name}</h3>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-farm-primary font-bold text-sm">Rp {p.price.toLocaleString()}</span>
+                                    <button onClick={() => onAdd(p)} className="w-8 h-8 bg-farm-primary text-white rounded-full flex items-center justify-center hover:scale-110 transition active:scale-90 shadow-md">
+                                        <i className="fa-solid fa-plus text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+
+        // --- MODALS ---
+        const PreOrderModal = ({ onClose }) => {
+            const [val, setVal] = useState("");
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+                    <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 text-center relative shadow-2xl animate-pop">
+                        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i className="fa-solid fa-xmark text-xl"></i></button>
+                        <div className="w-14 h-14 bg-farm-soft rounded-full flex items-center justify-center mx-auto mb-4 text-farm-primary text-2xl"><i className="fa-solid fa-magnifying-glass"></i></div>
+                        <h3 className="font-heading text-xl font-bold mb-2 text-farm-dark">Request Bibit</h3>
+                        <p className="text-xs text-slate-500 mb-6">Barang akan dicarikan (Estimasi 1-2 Minggu)</p>
+                        <div className="bg-slate-50 p-2 rounded-xl flex border border-slate-200 mb-4">
+                            <input value={val} onChange={(e)=>setVal(e.target.value)} placeholder="Nama bibit..." className="bg-transparent flex-1 px-3 text-sm text-farm-dark placeholder-slate-400 outline-none" />
+                        </div>
+                        <button onClick={()=>{if(val) openWA(`Halo Admin, saya mau Request PO: ${val}`)}} className="w-full bg-farm-primary text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition">Kirim WA</button>
+                    </div>
+                </div>
+            )
+        };
+
+        const QuizModal = ({ onClose, addToCart }) => {
+            const [step, setStep] = useState(0);
+            const [winner, setWinner] = useState(null);
+            const handleAnswer = (yes) => {
+                if(step < 7) setStep(step+1);
+                else setWinner(PRODUCTS[Math.floor(Math.random() * PRODUCTS.length)]); 
+            }
+            return (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+                    <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 text-center relative shadow-2xl animate-pop">
+                        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i className="fa-solid fa-xmark text-xl"></i></button>
+                        {!winner ? (
+                            <>
+                                <div className="text-xs text-farm-primary font-bold mb-4 uppercase">Pertanyaan {step + 1} / 8</div>
+                                <h3 className="font-heading text-2xl font-bold mb-8 min-h-[80px] flex items-center justify-center text-farm-dark">Apakah lahan Anda terkena matahari penuh?</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <button onClick={()=>handleAnswer(true)} className="bg-farm-primary text-white py-4 rounded-2xl font-bold hover:scale-105 transition shadow-lg shadow-emerald-200">YA</button>
+                                    <button onClick={()=>handleAnswer(false)} className="bg-slate-100 text-slate-600 py-4 rounded-2xl font-bold hover:bg-slate-200 transition">TIDAK</button>
+                                </div>
+                            </>
+                        ) : (
+                            <div>
+                                <div className="text-4xl mb-2">🎉</div>
+                                <p className="text-xs text-slate-400 uppercase tracking-widest mb-2">Rekomendasi:</p>
+                                <h3 className="font-heading text-2xl font-bold mb-4 text-farm-primary">{winner.name}</h3>
+                                <img src={winner.img} className="w-full h-40 object-cover rounded-xl mb-6 shadow-md" />
+                                <button onClick={()=>{addToCart(winner); onClose();}} className="w-full bg-farm-primary text-white py-3 rounded-xl font-bold hover:scale-105 transition shadow-lg">Ambil Ini</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )
+        };
+
+        const CartModal = ({ cart, isOpen, onClose, checkout, updateQty }) => {
+            if(!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose}></div>
+                    <div className="bg-white w-full rounded-t-[2rem] p-6 relative z-10 max-h-[80vh] flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.1)] animate-pop">
+                        <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-6"></div>
+                        <h2 className="font-heading text-xl font-bold mb-4 flex items-center gap-2 text-farm-dark">Keranjang Belanja</h2>
+                        <div className="flex-1 overflow-y-auto space-y-3 mb-4 pr-2">
+                            {cart.length === 0 && <p className="text-slate-400 text-center py-10">Keranjang kosong.</p>}
+                            {cart.map((c) => (
+                                <div key={c.id} className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                    <img src={c.img} className="w-12 h-12 rounded-xl object-cover" />
+                                    <div className="flex-1"><h4 className="font-bold text-farm-dark text-sm">{c.name}</h4><p className="text-farm-primary text-xs">Rp {c.price.toLocaleString()}</p></div>
+                                    <div className="flex items-center gap-3 bg-white rounded-lg px-2 py-1 border border-slate-200 shadow-sm">
+                                        <button onClick={()=>updateQty(c.id, -1)} className="text-slate-400 hover:text-red-500">-</button>
+                                        <span className="text-sm font-bold w-4 text-center text-farm-dark">{c.qty}</span>
+                                        <button onClick={()=>updateQty(c.id, 1)} className="text-slate-400 hover:text-farm-primary">+</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <div className="flex justify-between mb-4 text-lg font-bold text-farm-dark"><span>Total</span><span className="text-farm-primary">Rp {cart.reduce((a,b)=>a+(b.price*b.qty),0).toLocaleString()}</span></div>
+                            <button onClick={checkout} className="w-full bg-farm-primary text-white py-4 rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200">Checkout WA</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- NEW: POP-UP NOTIFICATION (PREMIUM) ---
+        const SuccessPopup = ({ product, onClose, onGoCart }) => {
+            if(!product) return null;
+            return (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-pop">
+                    <div className="bg-white rounded-[2rem] p-6 max-w-xs w-full text-center shadow-2xl relative">
+                        <div className="w-16 h-16 bg-farm-soft rounded-full flex items-center justify-center mx-auto mb-4 text-farm-primary text-3xl shadow-sm animate-bounce">
+                            <i className="fa-solid fa-check"></i>
+                        </div>
+                        <h3 className="font-heading text-xl font-bold text-farm-dark mb-1">Berhasil!</h3>
+                        <p className="text-sm text-slate-500 mb-6">{product.name} masuk keranjang.</p>
+                        <div className="flex flex-col gap-3">
+                            <button onClick={onGoCart} className="w-full bg-farm-primary text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200">Lihat Keranjang</button>
+                            <button onClick={onClose} className="w-full bg-slate-50 text-slate-500 py-3 rounded-xl font-bold hover:bg-slate-100 transition">Lanjut Belanja</button>
+                        </div>
+                    </div>
+                </div>
+            )
+        }
+
+        // --- MAIN APP ---
+        const App = () => {
+            const [view, setView] = useState('home');
+            const [cart, setCart] = useState([]);
+            const [quiz, setQuiz] = useState(false);
+            const [po, setPo] = useState(false);
+            const [cartOpen, setCartOpen] = useState(false);
+            const [addedItem, setAddedItem] = useState(null); // For Success Popup
+
+            const addToCart = (p) => {
+                setCart(prev => {
+                    const exist = prev.find(item => item.id === p.id);
+                    if(exist) return prev.map(item => item.id === p.id ? {...item, qty: item.qty + 1} : item);
+                    return [...prev, {...p, qty: 1}];
+                });
+                setAddedItem(p); // Trigger Popup
+            };
+
+            const updateQty = (id, n) => {
+                setCart(prev => prev.map(item => {
+                    if (item.id === id) return item.qty + n > 0 ? { ...item, qty: item.qty + n } : null;
+                    return item;
+                }).filter(Boolean));
+            };
+
+            const checkout = () => {
+                if(!cart.length) return;
+                let msg = "Halo Admin PENANDUR, Order Baru:%0A";
+                cart.forEach(i => msg += `${i.qty}x ${i.name}%0A`);
+                msg += `Total: Rp ${cart.reduce((a,b)=>a+(b.price*b.qty),0).toLocaleString()}`;
+                openWA(msg);
+            }
+
+            return (
+                <div className="min-h-screen relative">
+                    <div className="mesh-bg"></div>
+                    
+                    {view === 'home' && <HomePage onQuiz={()=>setQuiz(true)} onPreOrder={()=>setPo(true)} />}
+                    {view === 'shop' && <ShopPage onAdd={addToCart} />}
+
+                    <DockNav activeTab={view} setTab={setView} cartCount={cart.reduce((a,b)=>a+b.qty,0)} onCart={()=>setCartOpen(true)} />
+
+                    {quiz && <QuizModal onClose={()=>setQuiz(false)} addToCart={addToCart} />}
+                    {po && <PreOrderModal onClose={()=>setPo(false)} />}
+                    <CartModal cart={cart} isOpen={cartOpen} onClose={()=>setCartOpen(false)} updateQty={updateQty} checkout={checkout} />
+                    
+                    {/* Success Popup */}
+                    <SuccessPopup product={addedItem} onClose={()=>setAddedItem(null)} onGoCart={()=>{setAddedItem(null); setCartOpen(true);}} />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
